@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+	<meta charset="utf-8" />
+	<title>Random Image Display</title>
+	<script src="https://sdpi-components.dev/releases/v4/sdpi-components.js"></script>
+	<style>
+		body {
+			margin: 0;
+			padding: 20px;
+		}
+
+		.add-image-section {
+			margin-bottom: 20px;
+		}
+
+		.file-input-wrapper {
+			position: relative;
+			display: inline-block;
+			width: 100%;
+		}
+
+		.file-input-button {
+			display: block;
+			width: 100%;
+			padding: 10px;
+			background: #3498db;
+			color: white;
+			border: none;
+			border-radius: 4px;
+			cursor: pointer;
+			font-size: 14px;
+			text-align: center;
+		}
+
+		.file-input-button:hover {
+			background: #2980b9;
+		}
+
+		#fileInputHidden {
+			position: absolute;
+			left: -9999px;
+		}
+
+		.image-list {
+			display: flex;
+			flex-direction: column;
+			gap: 8px;
+			margin-top: 16px;
+		}
+
+		.image-item {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			padding: 12px;
+			background: rgba(255, 255, 255, 0.05);
+			border-radius: 6px;
+			border: 1px solid rgba(255, 255, 255, 0.1);
+		}
+
+		.image-info {
+			display: flex;
+			align-items: center;
+			gap: 12px;
+			flex: 1;
+			min-width: 0;
+		}
+
+		.image-preview {
+			width: 40px;
+			height: 40px;
+			border-radius: 4px;
+			object-fit: cover;
+			border: 1px solid rgba(255, 255, 255, 0.2);
+			flex-shrink: 0;
+			background: rgba(0, 0, 0, 0.3);
+		}
+
+		.image-name {
+			flex: 1;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+			font-size: 14px;
+		}
+
+		.remove-btn {
+			background: #e74c3c;
+			color: white;
+			border: none;
+			padding: 6px 12px;
+			border-radius: 4px;
+			cursor: pointer;
+			font-size: 12px;
+			font-weight: 500;
+			transition: background 0.2s;
+			flex-shrink: 0;
+		}
+
+		.remove-btn:hover {
+			background: #c0392b;
+		}
+
+		.empty-state {
+			text-align: center;
+			padding: 32px 20px;
+			color: #888;
+			font-style: italic;
+			font-size: 14px;
+		}
+
+		sdpi-item {
+			margin-bottom: 16px;
+		}
+	</style>
+</head>
+<body>
+	<sdpi-item label="Add Image">
+		<div class="file-input-wrapper">
+			<button class="file-input-button" id="fileButton">Choose Image File</button>
+			<input type="file" id="fileInputHidden" accept="image/*">
+		</div>
+	</sdpi-item>
+
+	<sdpi-item label="Allow Repeats">
+		<sdpi-checkbox id="allowRepeatsCheckbox" setting="allowRepeats"></sdpi-checkbox>
+	</sdpi-item>
+
+	<sdpi-item label="Images">
+		<div class="image-list" id="imageList">
+			<div class="empty-state">No images added yet. Select an image above to get started.</div>
+		</div>
+	</sdpi-item>
+
+	<script>
+		const { streamDeckClient } = SDPIComponents;
+		let currentImages = [];
+		let isInitialized = false;
+
+		console.log('Script loaded');
+
+		// Get elements
+		const fileButton = document.getElementById('fileButton');
+		const fileInput = document.getElementById('fileInputHidden');
+		const allowRepeatsCheckbox = document.getElementById('allowRepeatsCheckbox');
+
+		// Make button trigger file input
+		fileButton.addEventListener('click', () => {
+			console.log('Button clicked, opening file dialog');
+			fileInput.click();
+		});
+
+		// Listen for file selection
+		fileInput.addEventListener('change', async (event) => {
+			console.log('File input change event fired!');
+			
+			const files = event.target.files;
+			console.log('Files:', files);
+			
+			if (files && files.length > 0) {
+				const file = files[0];
+				
+				console.log('File object:', file);
+				console.log('File name:', file.name);
+				console.log('File path property:', file.path);
+				
+				// Try to get the file path - it might be in file.path or file.name (URL encoded)
+				let filePath = file.path || file.name;
+				
+				// Decode URL encoding if present
+				try {
+					filePath = decodeURIComponent(filePath);
+					console.log('Decoded file path:', filePath);
+				} catch (e) {
+					console.log('Could not decode path:', e);
+				}
+				
+				if (filePath && filePath.length > 0) {
+					console.log('Using file path:', filePath);
+					
+					if (!currentImages.includes(filePath)) {
+						currentImages.push(filePath);
+						console.log('Added to images array:', currentImages);
+						await saveImages();
+						updateImageList();
+						
+						// Force sync the checkbox state after a short delay
+						setTimeout(async () => {
+							const settings = await streamDeckClient.getSettings();
+							if (allowRepeatsCheckbox && settings.allowRepeats !== undefined) {
+								allowRepeatsCheckbox.checked = settings.allowRepeats;
+								console.log('Synced checkbox to:', settings.allowRepeats);
+							}
+						}, 100);
+					} else {
+						console.log('Image already in list');
+					}
+				} else {
+					console.log('No valid file path found');
+					alert('Could not get file path. Make sure the plugin is running in Stream Deck.');
+				}
+				
+				// Clear the input
+				fileInput.value = '';
+			} else {
+				console.log('No files selected');
+			}
+		});
+
+		// Initialize when the property inspector loads
+		async function initialize() {
+			if (isInitialized) return;
+			isInitialized = true;
+
+			console.log('Initializing property inspector...');
+			
+			// Wait a bit for the Stream Deck connection to be fully ready
+			await new Promise(resolve => setTimeout(resolve, 100));
+			
+			// Load initial settings
+			const settingsPayload = await streamDeckClient.getSettings();
+			console.log('Loaded settings payload:', JSON.stringify(settingsPayload));
+			
+			// Extract the actual settings from the payload
+			const settings = settingsPayload?.settings || settingsPayload || {};
+			console.log('Actual settings:', JSON.stringify(settings));
+			console.log('Settings.images:', settings.images);
+			
+			// Load images first
+			if (settings && settings.images && Array.isArray(settings.images)) {
+				currentImages = settings.images;
+				console.log('Loaded images:', currentImages);
+			} else {
+				currentImages = [];
+				console.log('No images found, starting with empty array');
+			}
+			
+			// Initialize allowRepeats if not set, default to true
+			if (settings && settings.allowRepeats === undefined) {
+				console.log('allowRepeats not set, defaulting to true');
+				// Don't save yet, just set the checkbox
+				if (allowRepeatsCheckbox) {
+					allowRepeatsCheckbox.checked = true;
+				}
+			} else if (settings) {
+				// Set checkbox to match the saved setting
+				console.log('allowRepeats loaded as:', settings.allowRepeats);
+				if (allowRepeatsCheckbox) {
+					allowRepeatsCheckbox.checked = settings.allowRepeats;
+				}
+			}
+			
+			// Update the UI with loaded images
+			console.log('Updating image list with', currentImages.length, 'images');
+			updateImageList();
+		}
+
+		// Save images to settings
+		async function saveImages() {
+			console.log('Saving images:', currentImages);
+			
+			// Get the absolute latest settings to preserve all fields
+			const payload = await streamDeckClient.getSettings();
+			console.log('Full payload from getSettings:', payload);
+			
+			// Extract settings - they might be nested or at root
+			const existingData = payload?.settings || payload || {};
+			console.log('Extracted existing data:', existingData);
+			
+			// Build new settings object, preserving existing values
+			const settingsToSave = {
+				images: currentImages,
+				allowRepeats: existingData.allowRepeats !== undefined ? existingData.allowRepeats : true,
+				lastImageIndex: existingData.lastImageIndex !== undefined ? existingData.lastImageIndex : -1
+			};
+			
+			console.log('Settings to save:', settingsToSave);
+			await streamDeckClient.setSettings(settingsToSave);
+			console.log('Save complete');
+		}
+
+		// Remove an image from the list
+		async function removeImage(index) {
+			console.log('Removing image at index:', index);
+			currentImages.splice(index, 1);
+			await saveImages();
+			updateImageList();
+			
+			// Force sync the checkbox state after removal
+			setTimeout(async () => {
+				const settingsPayload = await streamDeckClient.getSettings();
+				const settings = settingsPayload?.settings || settingsPayload || {};
+				if (allowRepeatsCheckbox && settings.allowRepeats !== undefined) {
+					allowRepeatsCheckbox.checked = settings.allowRepeats;
+					console.log('Synced checkbox after removal to:', settings.allowRepeats);
+				}
+			}, 100);
+		}
+
+		// Update the displayed list of images
+		function updateImageList() {
+			console.log('updateImageList called');
+			console.log('Current images array:', currentImages);
+			console.log('Current images length:', currentImages.length);
+			
+			const listContainer = document.getElementById('imageList');
+			console.log('List container found:', !!listContainer);
+			
+			if (!listContainer) {
+				console.error('Image list container not found!');
+				return;
+			}
+			
+			if (currentImages.length === 0) {
+				console.log('No images, showing empty state');
+				listContainer.innerHTML = '<div class="empty-state">No images added yet. Select an image above to get started.</div>';
+				return;
+			}
+			
+			console.log('Building list for', currentImages.length, 'images');
+			listContainer.innerHTML = '';
+			
+			currentImages.forEach((imagePath, index) => {
+				console.log('Adding image', index, ':', imagePath);
+				
+				const itemDiv = document.createElement('div');
+				itemDiv.className = 'image-item';
+				
+				const infoDiv = document.createElement('div');
+				infoDiv.className = 'image-info';
+				
+				// Create image preview
+				const img = document.createElement('img');
+				img.className = 'image-preview';
+				img.src = `file://${imagePath}`;
+				img.alt = `Picture ${index + 1}`;
+				
+				// Handle image load error
+				img.onerror = function() {
+					console.log('Failed to load image:', imagePath);
+					this.style.display = 'none';
+				};
+				
+				const nameSpan = document.createElement('span');
+				nameSpan.className = 'image-name';
+				
+				// Extract filename from path
+				const filename = imagePath.split(/[/\\]/).pop();
+				nameSpan.textContent = `Picture ${index + 1}: ${filename}`;
+				nameSpan.title = imagePath;
+				
+				const removeBtn = document.createElement('button');
+				removeBtn.className = 'remove-btn';
+				removeBtn.textContent = '✕ Remove';
+				removeBtn.onclick = () => removeImage(index);
+				
+				infoDiv.appendChild(img);
+				infoDiv.appendChild(nameSpan);
+				itemDiv.appendChild(infoDiv);
+				itemDiv.appendChild(removeBtn);
+				listContainer.appendChild(itemDiv);
+			});
+			
+			console.log('Image list updated successfully');
+		}
+
+		// Initialize when the page loads
+		if (document.readyState === 'loading') {
+			document.addEventListener('DOMContentLoaded', initialize);
+		} else {
+			initialize();
+		}
+
+		console.log('Event listeners attached');
+	</script>
+</body>
+</html>
