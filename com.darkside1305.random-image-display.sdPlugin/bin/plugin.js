@@ -11535,6 +11535,7 @@ let RandomImageAction = (() => {
                     images: [],
                     gifSettings: {},
                     allowRepeats: true,
+                    playGifsOnLoad: true,
                     lastImageIndex: -1
                 });
                 await ev.action.setImage("imgs/actions/random/random-icon-white.png");
@@ -11542,10 +11543,28 @@ let RandomImageAction = (() => {
             }
             if (settings.allowRepeats === undefined)
                 settings.allowRepeats = true;
+            if (settings.playGifsOnLoad === undefined)
+                settings.playGifsOnLoad = true;
             if (!settings.gifSettings)
                 settings.gifSettings = {};
-            if (settings.images.length > 0) {
-                await this.showRandomImage(ev.action, settings);
+            // Show the last displayed image (or default icon if none)
+            if (settings.images.length > 0 && settings.lastImageIndex !== undefined && settings.lastImageIndex >= 0) {
+                const lastImagePath = settings.images[settings.lastImageIndex];
+                // Check if it's a GIF
+                if (this.isGif(lastImagePath)) {
+                    // Only play GIF if playGifsOnLoad is enabled
+                    if (settings.playGifsOnLoad !== false) {
+                        const loop = settings.gifSettings?.[lastImagePath]?.loop !== false;
+                        await this.playGif(ev.action, lastImagePath, loop);
+                    }
+                    else {
+                        // Just show the first frame (static)
+                        await ev.action.setImage(lastImagePath);
+                    }
+                }
+                else {
+                    await ev.action.setImage(lastImagePath);
+                }
             }
             else {
                 await ev.action.setImage("imgs/actions/random/random-icon-white.png");

@@ -158,6 +158,10 @@
 		<sdpi-checkbox id="allowRepeatsCheckbox" setting="allowRepeats"></sdpi-checkbox>
 	</sdpi-item>
 
+	<sdpi-item label="Play GIFs on Load">
+		<sdpi-checkbox id="playGifsOnLoadCheckbox" setting="playGifsOnLoad"></sdpi-checkbox>
+	</sdpi-item>
+
 	<sdpi-item label="Images">
 		<div class="image-list" id="imageList">
 			<div class="empty-state">No images added yet. Select an image above to get started.</div>
@@ -176,6 +180,7 @@
 		const fileButton = document.getElementById('fileButton');
 		const fileInput = document.getElementById('fileInputHidden');
 		const allowRepeatsCheckbox = document.getElementById('allowRepeatsCheckbox');
+		const playGifsOnLoadCheckbox = document.getElementById('playGifsOnLoadCheckbox');
 
 		// Check if a file is a GIF
 		function isGif(filePath) {
@@ -292,15 +297,26 @@
 			// Initialize allowRepeats if not set, default to true
 			if (settings && settings.allowRepeats === undefined) {
 				console.log('allowRepeats not set, defaulting to true');
-				// Don't save yet, just set the checkbox
 				if (allowRepeatsCheckbox) {
 					allowRepeatsCheckbox.checked = true;
 				}
 			} else if (settings) {
-				// Set checkbox to match the saved setting
 				console.log('allowRepeats loaded as:', settings.allowRepeats);
 				if (allowRepeatsCheckbox) {
 					allowRepeatsCheckbox.checked = settings.allowRepeats;
+				}
+			}
+			
+			// Initialize playGifsOnLoad if not set, default to true
+			if (settings && settings.playGifsOnLoad === undefined) {
+				console.log('playGifsOnLoad not set, defaulting to true');
+				if (playGifsOnLoadCheckbox) {
+					playGifsOnLoadCheckbox.checked = true;
+				}
+			} else if (settings) {
+				console.log('playGifsOnLoad loaded as:', settings.playGifsOnLoad);
+				if (playGifsOnLoadCheckbox) {
+					playGifsOnLoadCheckbox.checked = settings.playGifsOnLoad;
 				}
 			}
 			
