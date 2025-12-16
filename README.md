@@ -134,6 +134,11 @@ MIT License - See [LICENSE](LICENSE) file for details
 
 ## Changelog
 
+### v1.1.1.0 - Play on Load Control
+- **"Play GIFs on Load" toggle** - Control whether GIFs animate when folders open
+- Fixed buttons randomizing image when opening folders (now restores last image)
+- GIFs show first frame when "Play GIFs on Load" is OFF
+
 ### v1.1.0.0 - Animated GIF Support
 - **Animated GIF playback** - GIFs now animate smoothly frame-by-frame
 - **Per-GIF loop control** - Toggle "Loop Forever" on/off for each GIF individually
