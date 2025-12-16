@@ -51,12 +51,18 @@
 
 		.image-item {
 			display: flex;
-			align-items: center;
-			justify-content: space-between;
+			flex-direction: column;
 			padding: 12px;
 			background: rgba(255, 255, 255, 0.05);
 			border-radius: 6px;
 			border: 1px solid rgba(255, 255, 255, 0.1);
+			gap: 8px;
+		}
+
+		.image-main-row {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
 		}
 
 		.image-info {
@@ -85,6 +91,16 @@
 			font-size: 14px;
 		}
 
+		.gif-badge {
+			background: #9b59b6;
+			color: white;
+			padding: 2px 6px;
+			border-radius: 3px;
+			font-size: 10px;
+			font-weight: bold;
+			margin-left: 8px;
+		}
+
 		.remove-btn {
 			background: #e74c3c;
 			color: white;
@@ -100,6 +116,21 @@
 
 		.remove-btn:hover {
 			background: #c0392b;
+		}
+
+		.gif-options {
+			padding-left: 52px;
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			font-size: 13px;
+		}
+
+		.gif-options label {
+			display: flex;
+			align-items: center;
+			gap: 4px;
+			cursor: pointer;
 		}
 
 		.empty-state {
@@ -136,6 +167,7 @@
 	<script>
 		const { streamDeckClient } = SDPIComponents;
 		let currentImages = [];
+		let gifSettings = {}; // Store GIF-specific settings (loop mode)
 		let isInitialized = false;
 
 		console.log('Script loaded');
@@ -144,6 +176,11 @@
 		const fileButton = document.getElementById('fileButton');
 		const fileInput = document.getElementById('fileInputHidden');
 		const allowRepeatsCheckbox = document.getElementById('allowRepeatsCheckbox');
+
+		// Check if a file is a GIF
+		function isGif(filePath) {
+			return filePath.toLowerCase().endsWith('.gif');
+		}
 
 		// Make button trigger file input
 		fileButton.addEventListener('click', () => {
@@ -182,6 +219,13 @@
 					if (!currentImages.includes(filePath)) {
 						currentImages.push(filePath);
 						console.log('Added to images array:', currentImages);
+						
+						// If it's a GIF, initialize its settings (default to loop)
+						if (isGif(filePath)) {
+							gifSettings[filePath] = { loop: true };
+							console.log('Detected GIF, initialized with loop=true');
+						}
+						
 						await saveImages();
 						updateImageList();
 						
@@ -236,6 +280,15 @@
 				console.log('No images found, starting with empty array');
 			}
 			
+			// Load GIF settings
+			if (settings && settings.gifSettings) {
+				gifSettings = settings.gifSettings;
+				console.log('Loaded GIF settings:', gifSettings);
+			} else {
+				gifSettings = {};
+				console.log('No GIF settings found, starting with empty object');
+			}
+			
 			// Initialize allowRepeats if not set, default to true
 			if (settings && settings.allowRepeats === undefined) {
 				console.log('allowRepeats not set, defaulting to true');
@@ -259,6 +312,7 @@
 		// Save images to settings
 		async function saveImages() {
 			console.log('Saving images:', currentImages);
+			console.log('Saving GIF settings:', gifSettings);
 			
 			// Get the absolute latest settings to preserve all fields
 			const payload = await streamDeckClient.getSettings();
@@ -271,6 +325,7 @@
 			// Build new settings object, preserving existing values
 			const settingsToSave = {
 				images: currentImages,
+				gifSettings: gifSettings,
 				allowRepeats: existingData.allowRepeats !== undefined ? existingData.allowRepeats : true,
 				lastImageIndex: existingData.lastImageIndex !== undefined ? existingData.lastImageIndex : -1
 			};
@@ -280,10 +335,31 @@
 			console.log('Save complete');
 		}
 
+		// Toggle GIF loop setting
+		async function toggleGifLoop(imagePath) {
+			if (gifSettings[imagePath]) {
+				gifSettings[imagePath].loop = !gifSettings[imagePath].loop;
+			} else {
+				gifSettings[imagePath] = { loop: false };
+			}
+			console.log('Toggled GIF loop for', imagePath, 'to', gifSettings[imagePath].loop);
+			await saveImages();
+			updateImageList();
+		}
+
 		// Remove an image from the list
 		async function removeImage(index) {
 			console.log('Removing image at index:', index);
+			const imagePath = currentImages[index];
+			
+			// Remove from images array
 			currentImages.splice(index, 1);
+			
+			// Remove GIF settings if it exists
+			if (gifSettings[imagePath]) {
+				delete gifSettings[imagePath];
+			}
+			
 			await saveImages();
 			updateImageList();
 			
@@ -327,6 +403,10 @@
 				const itemDiv = document.createElement('div');
 				itemDiv.className = 'image-item';
 				
+				// Main row with image preview and buttons
+				const mainRow = document.createElement('div');
+				mainRow.className = 'image-main-row';
+				
 				const infoDiv = document.createElement('div');
 				infoDiv.className = 'image-info';
 				
@@ -348,6 +428,15 @@
 				// Extract filename from path
 				const filename = imagePath.split(/[/\\]/).pop();
 				nameSpan.textContent = `Picture ${index + 1}: ${filename}`;
+				
+				// Add GIF badge if it's a GIF
+				if (isGif(imagePath)) {
+					const gifBadge = document.createElement('span');
+					gifBadge.className = 'gif-badge';
+					gifBadge.textContent = 'GIF';
+					nameSpan.appendChild(gifBadge);
+				}
+				
 				nameSpan.title = imagePath;
 				
 				const removeBtn = document.createElement('button');
@@ -357,8 +446,28 @@
 				
 				infoDiv.appendChild(img);
 				infoDiv.appendChild(nameSpan);
-				itemDiv.appendChild(infoDiv);
-				itemDiv.appendChild(removeBtn);
+				mainRow.appendChild(infoDiv);
+				mainRow.appendChild(removeBtn);
+				itemDiv.appendChild(mainRow);
+				
+				// Add GIF options if it's a GIF
+				if (isGif(imagePath)) {
+					const gifOptions = document.createElement('div');
+					gifOptions.className = 'gif-options';
+					
+					const loopLabel = document.createElement('label');
+					const loopCheckbox = document.createElement('input');
+					loopCheckbox.type = 'checkbox';
+					loopCheckbox.checked = gifSettings[imagePath]?.loop !== false; // Default to true
+					loopCheckbox.onchange = () => toggleGifLoop(imagePath);
+					
+					loopLabel.appendChild(loopCheckbox);
+					loopLabel.appendChild(document.createTextNode(' Loop Forever'));
+					
+					gifOptions.appendChild(loopLabel);
+					itemDiv.appendChild(gifOptions);
+				}
+				
 				listContainer.appendChild(itemDiv);
 			});
 			
