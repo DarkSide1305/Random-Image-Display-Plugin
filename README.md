@@ -134,6 +134,16 @@ MIT License - See [LICENSE](LICENSE) file for details
 
 ## Changelog
 
+### v1.1.0.0 - Animated GIF Support
+- **Animated GIF playback** - GIFs now animate smoothly frame-by-frame
+- **Per-GIF loop control** - Toggle "Loop Forever" on/off for each GIF individually
+- **Auto-detection** - GIFs automatically detected with purple "GIF" badge
+- **Smart caching** - GIFs decoded once and cached for performance
+- **Proper frame compositing** - Handles GIF disposal methods and transparency correctly
+- Fixed settings persistence across Stream Deck restarts
+- Fixed checkbox sync issues in Property Inspector
+- 300ms initial animation delay for better user experience
+
 ### v1.0.0.0 (Initial Release)
 - Random image display functionality
 - Multiple image support
